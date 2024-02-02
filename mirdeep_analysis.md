@@ -1,28 +1,53 @@
----
-title: "mirdeep_analysis"
-author: "Brecia Douglas"
-date: "2024-02-02"
-output: github_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, error = FALSE, fig.path='Figures/', dev=c('png', 'pdf'))
-options(knitr.table.format = 'markdown')
-options(scipen=10000)
-```
+mirdeep_analysis
+================
+Brecia Douglas
+2024-02-02
 
 Loading in R packages
-```{r}
+
+``` r
 library(tidyverse)
+```
+
+    ## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+    ## ✔ dplyr     1.1.3     ✔ readr     2.1.4
+    ## ✔ forcats   1.0.0     ✔ stringr   1.5.0
+    ## ✔ ggplot2   3.4.3     ✔ tibble    3.2.1
+    ## ✔ lubridate 1.9.2     ✔ tidyr     1.3.0
+    ## ✔ purrr     1.0.2     
+    ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+    ## ✖ dplyr::filter() masks stats::filter()
+    ## ✖ dplyr::lag()    masks stats::lag()
+    ## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+
+``` r
 library(kableExtra)
+```
+
+    ## 
+    ## Attaching package: 'kableExtra'
+    ## 
+    ## The following object is masked from 'package:dplyr':
+    ## 
+    ##     group_rows
+
+``` r
 library(UpSetR)
 library(ggplot2)
 library(ggupset)
 library(ComplexUpset)
 ```
 
+    ## 
+    ## Attaching package: 'ComplexUpset'
+    ## 
+    ## The following object is masked from 'package:UpSetR':
+    ## 
+    ##     upset
+
 Read in mirdeep files
-```{r}
+
+``` r
 adi <- read.csv("~/Desktop/RNA_Analysis_Lab/RNA_Analysis/mirdeep_files/result_23_04_2023_t_12_30_38.csv")
 ami <- read.csv("~/Desktop/RNA_Analysis_Lab/RNA_Analysis/mirdeep_files/result_23_04_2023_t_12_31_38.csv")
 avi <- read.csv("~/Desktop/RNA_Analysis_Lab/RNA_Analysis/mirdeep_files/result_23_04_2023_t_12_34_02.csv")
@@ -38,7 +63,8 @@ spi <- read.csv("~/Desktop/RNA_Analysis_Lab/RNA_Analysis/mirdeep_files/result_23
 ```
 
 Creating combined file with all conserved species
-```{r}
+
+``` r
 adi_sub <- adi %>%
   select("provisional_id", "example_miRBase_miRNA_with_the_same_seed") %>%
   rename(miRNA_adi = example_miRBase_miRNA_with_the_same_seed)
@@ -87,7 +113,8 @@ all_sp_merge <- all_species_list %>%
 ```
 
 Common miRNA appear in at least 4 of the 11 species
-```{r}
+
+``` r
 common_id <- all_sp_merge %>%
   mutate(n_missing = rowSums(all_sp_merge == "-")) %>%
   filter(n_missing <= 7) %>%
@@ -111,11 +138,154 @@ common_full <- merge(adi, common_id, by="provisional_id") %>%
   arrange(common_name_miRNA)
 
 kable(common_full)
+```
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">
+provisional_id
+</th>
+<th style="text-align:left;">
+consensus_mature_sequence
+</th>
+<th style="text-align:right;">
+common_name_miRNA
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_1_1115
+</td>
+<td style="text-align:left;">
+ucccguagauccgaacuugugg
+</td>
+<td style="text-align:right;">
+100
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_98_38275
+</td>
+<td style="text-align:left;">
+aagaacacccaaaauagcugagga
+</td>
+<td style="text-align:right;">
+2022
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_1_691
+</td>
+<td style="text-align:left;">
+uauauuguacgacucucaucgugu
+</td>
+<td style="text-align:right;">
+2023
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_43_22758
+</td>
+<td style="text-align:left;">
+uuugcuaguugcuuuugucccgu
+</td>
+<td style="text-align:right;">
+2025
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_11_7131
+</td>
+<td style="text-align:left;">
+ugugauuggagacuuuuaucgu
+</td>
+<td style="text-align:right;">
+2026
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_23_14151
+</td>
+<td style="text-align:left;">
+uuucaaauuaggaagggagguguu
+</td>
+<td style="text-align:right;">
+2030
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_9_6161
+</td>
+<td style="text-align:left;">
+auuuuuagcccgcggaaguugc
+</td>
+<td style="text-align:right;">
+2036
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_49_24339
+</td>
+<td style="text-align:left;">
+aaagaaguacaagugguaggg
+</td>
+<td style="text-align:right;">
+2037
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_151_44415
+</td>
+<td style="text-align:left;">
+uagcauaacauuguaagagauc
+</td>
+<td style="text-align:right;">
+2050
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_40_20559
+</td>
+<td style="text-align:left;">
+uuaacgaguagauaaaugaagag
+</td>
+<td style="text-align:right;">
+9425
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+Acerv_scaffold_1_839
+</td>
+<td style="text-align:left;">
+auugauuguagacaagccucuga
+</td>
+<td style="text-align:right;">
+9473
+</td>
+</tr>
+</tbody>
+</table>
+
+``` r
 #write.csv(common_full, "~/Desktop/miRNA_Characterization/common_miRNAs.csv")
 ```
 
 miRNA Filtering
-```{r}
+
+``` r
 cerv_miRNA_all <- merge(adi, all_sp_merge, by="provisional_id", all.y = TRUE)
 
 #significant randfold p-value (24 removed), miRNA_score > 10* (176 removed) and minimum of 10 reads (none removed, all had >10).
@@ -131,7 +301,8 @@ cerv_miRNA_filter <- cerv_miRNA_all %>%
 ```
 
 Upset plots
-```{r}
+
+``` r
 #upset plot of the 21 in cervicornis shared by other cnidarians
 #39 novel to cervicornis
 all_sp_merge %>%
@@ -152,3 +323,7 @@ all_sp_merge %>%
   theme_combmatrix(combmatrix.label.extra_spacing = 10)
 ```
 
+    ## `summarise()` has grouped output by 'provisional_id'. You can override using
+    ## the `.groups` argument.
+
+![](Figures/unnamed-chunk-6-1.png)<!-- -->
