@@ -23,6 +23,7 @@ library(stringdist)
 library(purrr)
 library(ape)
 library(msa)
+library(ggplot2)
 ```
 
 Read in mirdeep files, bonafides and find shared miRNAs
@@ -188,5 +189,30 @@ msaPrettyPrint(mir2036_aln, output="asis", showNames="right", showNumbering = "n
 msaPrettyPrint(mir2025_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
 ```
 
+Acropora cervicornis length distribution graph
+```{r}
+acerv_mirnas <- all_mirdeep_files %>%
+  filter(species == "adi") %>%
+  mutate(mirna_length = str_length(consensus_mature_sequence)) %>%
+  rowwise() %>%
+  mutate(count_u = str_count(consensus_mature_sequence,"u")) %>%
+  mutate(count_g = str_count(consensus_mature_sequence,"g")) %>%
+  mutate(count_c = str_count(consensus_mature_sequence,"c")) %>%
+  mutate(count_a = str_count(consensus_mature_sequence,"a")) %>%
+  mutate(start_nt = str_sub(consensus_mature_sequence, 1, 1)) %>%
+  select(mirna_length, start_nt) %>%
+  table() %>%
+  as.data.frame()
+
+ggplot(acerv_mirnas, aes(x=mirna_length, y=Freq, fill=start_nt)) +
+          geom_bar(stat="identity") +
+  xlab("Read Length") +
+  ylab("Percent of Total Reads") +
+  theme(legend.title= element_blank(),
+        legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)) 
+```
 
 
