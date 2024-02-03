@@ -21,11 +21,12 @@ library(kableExtra)
 library(seqinr)
 library(stringdist)
 library(purrr)
+library(ape)
+library(msa)
 ```
 
 Read in mirdeep files, bonafides and find shared miRNAs
 ```{r}
-#need to add in 3 jellyfish
 #read in bonafides file
 bonafides_acerv <- read_csv("~/Desktop/mirna_1Nov/bonafides_master.csv")
 
@@ -36,11 +37,13 @@ all_mirdeep_files <- list.files(path = '~/Desktop/miRNA_Characterization/miRNA_C
   summarise(read_csv(file), .groups = 'drop') %>%
   filter(provisional_id %in% bonafides_acerv$provisional_id)
 
+#shared mirnas according to mirdeep seed
 shared_mirnas <- all_mirdeep_files %>%
   select("species", "provisional_id", "example_miRBase_miRNA_with_the_same_seed") %>%
   filter(example_miRBase_miRNA_with_the_same_seed != "-") %>%
   pivot_wider(names_from = species, values_from = example_miRBase_miRNA_with_the_same_seed) %>%
   filter(provisional_id %in% bonafides_acerv$provisional_id)
+kable(shared_mirnas)
 
 common_mirnas <- shared_mirnas %>%
   mutate_all(funs(replace(., is.na(.), "-"))) %>%
@@ -50,7 +53,7 @@ common_mirnas <- shared_mirnas %>%
 kable(common_mirnas)
 ```
 
-Getting conserved miRNAs from mature sequences using criteria
+Getting conserved miRNAs from mature sequences using criteria (Wheeler et al., 2009)
 1. nt 2-7 are exact match -> seed
 2. length is +/- 2
 3. remainder of alignment only can contain up to 3 mismatches
@@ -64,7 +67,7 @@ fasta_to_table <- function(input_file) {
   ungroup %>%
   pivot_wider(names_from = grp, values_from = variable) %>%
   select(-rn) %>%
-  rename(mirna_id = variable1, mature_sequence = variable2) %>%
+  dplyr::rename(mirna_id = variable1, mature_sequence = variable2) %>%
   separate(col=mirna_id, into=c("carrot", "mirna_id"), sep=">") %>%
   select(-carrot)
 }
@@ -88,10 +91,13 @@ get_conserved <- function(specie, file) {
   len_seq <- target_species$mirna_len
   leftover_seq <- target_species$leftover_seq
   
+  #nt 2-7 of seed match
   find_seed <- function(seed){match_data <- filter(other_mirnas, seed_sequence == seed)}
   
+  #length is within +/- 2
   find_len <- function(mir_length){match_data <- filter(other_mirnas, mirna_len <= mir_length + 2 & mirna_len >= mir_length - 2)}
   
+  #no more than 3 mismatches in sequence without seed
   find_lev <- function(leftover){match_data <- filter(other_mirnas, stringdist(leftover, leftover_seq, method = "lv") < 3)}
 
   match_list_seed <- lapply(seed_seq, find_seed)
@@ -127,8 +133,60 @@ hydra <- get_conserved("hma", mirna_seq_files)
 
 all_species <- rbind(stylophora, cervicornis, millepora ,digitifera, nematostella , exaiptsia, carnea, callimorphus, senile, viridis, jardinei, coerulea, aurita, malayensis, esculentum, hydra) %>%
   filter(map_lgl(conserved, ~ nrow(.) != 0))
+
+all_species_shared <- all_species %>%
+  select(-seed_matches, -len_matches, -lev_good) %>%
+  unnest(cols = conserved, names_sep = "_") %>%
+  mutate(base_call = paste(species, mirna_id, sep = "_")) %>%
+  mutate(conserved_call = paste(conserved_species, conserved_mirna_id, sep = "_")) %>%
+  select(base_call, conserved_call) %>%
+  pivot_wider(names_from = base_call, values_from = conserved_call, values_fill = NA, values_fn = list) %>%
+  pivot_longer(everything()) %>% 
+  mutate(value = map(value, `length<-`, max(lengths(value)))) %>% 
+  pivot_wider(names_from = name, values_from = value) %>% 
+  unnest(everything())
 ```
 
+Base tree that is then edited in FigTree
+```{r}
+myTree <- ape::read.tree(text = "((Bilateria), (((Hma),((Sma, Aau), Res)), ((Hco), ((((Cja), ((Spi), ((Ace), (Adi, Ami))))), (((Avi),(Epa, Mse)), (Eca, Sca, Nve))))));")
+plot(myTree)
+
+ape::write.nexus(myTree, file='~/Desktop/miRNA_Characterization/miRNA_Characterization/base_cnidarian_tree.nex')
+```
+
+Showing common miRNAs alignment
+```{r results='asis'}
+mirna_100 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir100.fa", format="fasta")
+mirna_2030 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir2030.fa", format="fasta")
+mirna_2022 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir2022.fa", format="fasta")
+mirna_2023 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir2023.fa", format="fasta")
+mirna_2037 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir2037.fa", format="fasta")
+mirna_2036 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir2036.fa", format="fasta")
+mirna_2025 <- readDNAStringSet("~/Desktop/miRNA_Characterization/miRNA_Characterization/common_mirnas_fa/mir2025.fa", format="fasta")
+
+mir100_aln <- msa(mirna_100)
+mir2030_aln <- msa(mirna_2030)
+mir2022_aln <- msa(mirna_2022)
+mir2023_aln <- msa(mirna_2023)
+mir2037_aln <- msa(mirna_2037)
+mir2036_aln <- msa(mirna_2036)
+mir2025_aln <- msa(mirna_2025)
+
+msaPrettyPrint(mir100_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+
+msaPrettyPrint(mir2030_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+
+msaPrettyPrint(mir2022_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+
+msaPrettyPrint(mir2023_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+
+msaPrettyPrint(mir2037_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+
+msaPrettyPrint(mir2036_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+
+msaPrettyPrint(mir2025_aln, output="asis", showNames="right", showNumbering = "none", showConsensus = "bottom", consensusColors = "RedBlue", logoColors = "standard area", furtherCode=c("\\defconsensus{.}{lower}{upper}"), showLegend = FALSE, askForOverwrite = FALSE)
+```
 
 
 
