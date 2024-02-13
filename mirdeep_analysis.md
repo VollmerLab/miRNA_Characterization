@@ -310,7 +310,10 @@ ggplot(acerv_mirnas, aes(x=mirna_length, y=Freq, fill=start_nt)) +
           geom_bar(stat="identity") +
   xlab("Read Length") +
   ylab("Percent of Total Reads") +
+  ggtitle("Acropora cervicronis Bonafide miRNAs Starting Nucleotide Proportion") +
   theme(legend.title= element_blank(),
+        panel.grid.major = element_blank(), 
+               panel.grid.minor = element_blank(),
         legend.position = c(.95, .95),
     legend.justification = c("right", "top"),
     legend.box.just = "right",
