@@ -1,0 +1,170 @@
+---
+title: "pita_analysis"
+author: "Brecia Douglas"
+date: "2024-02-09"
+output: github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, error = FALSE, fig.path='Figures/', dev=c('png', 'pdf'))
+options(knitr.table.format = 'markdown')
+options(scipen=10000)
+```
+
+Load libraries
+```{r}
+library(tidyverse)
+library(ape)
+library(tidyr)
+library(dplyr)
+library(kableExtra)
+```
+
+```{r}
+results_file <- read.table("~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/tst_A_cerv_pita_results.tab", header=TRUE)
+
+#targets file takes results file and collapses all miRNAs sites that have a target of a single UTR and sums the energy score for that miRNA
+#targets_file <- read.table("~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/tst_A_cerv_pita_results_targets.tab", header=TRUE)
+
+#read in bonafides file
+bonafides_acerv <- read_csv("~/Desktop/mirna_1Nov/bonafides_master.csv")
+
+#subsetting results file according to pita instructions
+results_file_sub <- results_file %>%
+  filter(Seed == "7:0:0" | Seed == "7:0:1" |Seed == "8:0:0" | Seed == "8:0:1") %>%
+  filter(ddG <= -10) %>%
+  filter(microRNA %in% bonafides_acerv$provisional_id) 
+```
+
+Getting categories of pathways
+```{r}
+kegg_annotations <- read_csv('~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/kegg_annotations.csv.gz', show_col_types = FALSE)
+
+
+#### KEGG Pathway Identification ####
+if(file.exists('~/Desktop/RNA_Analysis_Lab/RNA_Analysis/PITA_files/kegg_orthogroup_pathways.csv.gz')){
+  kegg_paths <- read_csv('~/Desktop/RNA_Analysis_Lab/RNA_Analysis/PITA_files/kegg_orthogroup_pathways.csv.gz', show_col_types = FALSE)
+} else {
+  kegg_paths <- kegg_annotations %>%
+    filter(!is.na(kegg_orthology)) %>%
+    pivot_longer(cols = c(starts_with('kegg'), -kegg_orthology, -kegg_gene),
+                 names_prefix = 'kegg_',
+                 names_to = 'kegg_type',
+                 values_to = 'kegg_path_id') %>%
+    filter(!is.na(kegg_path_id)) %>%
+    mutate(kegg_path_id = str_split(kegg_path_id, ';;')) %>%
+    unnest(kegg_path_id) %>%
+    filter(kegg_type == 'pathway') %>%
+    
+    nest_by(kegg_type, kegg_path_id) %>%
+    mutate(kegg_api = possibly(keggGet, otherwise = list(NULL), quiet = FALSE)(kegg_path_id)) %>%
+    
+    unnest_wider(kegg_api) %>%
+    select(-contains(c('ENTRY', 'REFERENCE', 'DBLINKS', 'DISEASE', 'MODULE', 'DRUG', 'KO_PATHWAY'))) %>%
+    mutate(name_length = lengths(NAME)) %>%
+    rowwise %>%
+    mutate(DESCRIPTION = str_c(DESCRIPTION, collapse = ';;;;'),
+           DESCRIPTION = if_else(DESCRIPTION == "", NA_character_, DESCRIPTION),
+           
+           #May not want to do this - related pathways - network??
+           REL_PATHWAY = str_c(REL_PATHWAY, collapse = ';;;;'),
+           REL_PATHWAY = if_else(REL_PATHWAY == "", NA_character_, REL_PATHWAY)) %>%
+    mutate(NAME = case_when(name_length == 2 ~ list(str_c(unlist(NAME), collapse = ': ')), 
+                            name_length == 0 ~ list(NA_character_),
+                            TRUE ~ list(NAME))) %>%
+    ungroup %>%
+    select(-name_length) %>%
+    unnest(NAME) %>%
+    janitor::clean_names() %>%
+    separate(class, sep = '; ', into = c('major_category', 'minor_category')) %>%
+    unnest(data)
+  
+  write_csv(kegg_paths, '~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/kegg_orthogroup_pathways.csv.gz')
+}
+```
+
+```{r}
+acerv_gff <- read.gff("~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/k2_structuralAnnotations_wUTRs.gff3")
+
+ 
+table(acerv_gff$type)
+#33,794 total 28,059 validated genes
+#11,168 three prime UTRs
+
+kegg <- read_csv("~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/kegg_annotations.csv.gz")
+
+mRNA_annotations <- acerv_gff %>%
+  filter(type == "mRNA") %>%
+  filter(grepl("product=", attributes)) %>%
+  separate(col=attributes, into=c("name_id","name_parent", "gene", "other"), sep=";") %>%
+  select(-other) %>%
+  separate(col=gene, into=c("remove", "gene_name"), sep="=") %>%
+  select(-remove)
+
+kegg_merge <- as_tibble(acerv_gff) %>%
+  mutate(gene_id = str_extract(attributes, 'Acer_[0-9]+')) %>%
+  filter(type == 'mRNA') %>%
+  select(seqid, gene_id, start, end) %>%
+  left_join(kegg, by = 'gene_id')
+
+results_file_annotations <- results_file_sub %>%
+  separate(col=UTR, into=c("seqid", "range"), sep=":") %>%
+  separate(col=range, into=c("start", "end"), sep="-") %>%
+  select('seqid', 'start', 'end', 'microRNA') %>%
+  distinct() %>%
+  mutate_at(c("start", "end"), as.integer) %>%
+  left_join(kegg_merge, by = "seqid") %>%
+  filter(start.x >= start.y & end.x <= end.y)
+
+uniprot_id <- results_file_annotations %>%
+  select(uniprot_id) %>%
+  unique() %>%
+  separate(uniprot_id, into = c("prefix", "identifier"), sep=":") %>%
+  na.omit() %>%
+  mutate(accession_id = paste0("accession:", identifier))
+
+ids <- uniprot_id$identifier
+
+write(ids, file = "~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/ids.txt")
+
+uniprot_maps <- read.csv("~/Desktop/miRNA_Characterization/miRNA_Characterization/pita_files/acerv_idmappings.csv") %>%
+  mutate(uniprot_id = paste0("up:", Entry))
+
+results_file_annotations_wswiss <- results_file_annotations %>%
+  left_join(uniprot_maps, by = "uniprot_id")
+
+results_file_annotations_wcat <- results_file_annotations %>%
+  select(-kegg_pathway, -kegg_brite, -kegg_module) %>% 
+  left_join(select(kegg_paths, gene_id, kegg_gene, kegg_orthology,
+                   kegg_path_id, name, contains('category')) %>%
+              rename(kegg_path_name = name), 
+            by=c("gene_id", 'kegg_gene', 'kegg_orthology')) 
+```
+
+Creating table of target hits
+```{r}
+#table for each miRNA
+#          category   number targets    annotated   unannotated   swissprot   kegg    uniq kegg
+#mirna 1   cnidarian
+#mirna 2   unique
+
+mirna_names <- bonafides_acerv %>%
+  select(provisional_id, miRNA_common_name, miRNA_category) %>%
+  rename(microRNA = provisional_id)
+
+results_each_miRNA <- results_file_annotations_wswiss %>%
+  nest(.by = microRNA) %>%
+  mutate(num_targets = map(data, ~ nrow(.))) %>%
+  mutate(num_swiss_annotations = map(data, ~ length(na.omit(.$Protein.names)))) %>%
+  mutate(num_kegg_annotations = map(data, ~ length(na.omit(.$kegg_gene)))) %>%
+  left_join(mirna_names, by="microRNA")
+
+target_numbers <- results_each_miRNA %>%
+  dplyr::select(miRNA_common_name, num_targets, num_swiss_annotations, num_kegg_annotations, miRNA_category) %>%
+  arrange(miRNA_category)
+
+kable(target_numbers)
+```
+
