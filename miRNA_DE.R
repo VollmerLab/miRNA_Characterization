@@ -217,10 +217,8 @@ full_gene_post <- full_gene_models %>%
   mutate(across(starts_with('p.'), safe_qvalue,
                 .names = 'q.{.col}')) %>%
   rename_with(~str_replace_all(., 'q.p.', 'q.'))
-```
-Graphing signficant miRNAs differential expression
 
-```{r}
+#Graphing signficant miRNAs differential expression
 library(ComplexUpset)
 library(ggplot2)
 library(ggupset)
