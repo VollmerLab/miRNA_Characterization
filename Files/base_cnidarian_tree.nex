@@ -1,0 +1,47 @@
+#NEXUS
+[R-package APE, Wed Nov 20 11:40:03 2024]
+
+BEGIN TAXA;
+	DIMENSIONS NTAX = 17;
+	TAXLABELS
+		Bilateria
+		Hma
+		Sma
+		Aau
+		Res
+		Hco
+		Cja
+		Spi
+		Ace
+		Adi
+		Ami
+		Avi
+		Epa
+		Mse
+		Eca
+		Sca
+		Nve
+	;
+END;
+BEGIN TREES;
+	TRANSLATE
+		1	Bilateria,
+		2	Hma,
+		3	Sma,
+		4	Aau,
+		5	Res,
+		6	Hco,
+		7	Cja,
+		8	Spi,
+		9	Ace,
+		10	Adi,
+		11	Ami,
+		12	Avi,
+		13	Epa,
+		14	Mse,
+		15	Eca,
+		16	Sca,
+		17	Nve
+	;
+	TREE * UNTITLED = [&R] ((1),(((2),((3,4),5)),((6),(((((7),(8),((9),(10,11))))),(((12),(13,14)),(15,16,17))))));
+END;
